@@ -1,11 +1,11 @@
 {
-  "name": "thedotmack",
+  "name": "jimweller",
   "owner": {
-    "name": "Alex Newman"
+    "name": "Jim Weller"
   },
   "metadata": {
-    "description": "Plugins by Alex Newman (thedotmack)",
-    "homepage": "https://github.com/thedotmack/claude-mem"
+    "description": "Plugins by Jim Weller (jimweller)",
+    "homepage": "https://github.com/jimweller/claude-mem"
   },
   "plugins": [
     {
