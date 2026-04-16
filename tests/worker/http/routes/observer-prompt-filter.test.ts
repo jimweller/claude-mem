@@ -1,25 +1,37 @@
 import { describe, it, expect } from 'bun:test';
 
 /**
- * Tests that observer-sessions prompts are not stored in user_prompts.
- * The SDK agent runs under project "observer-sessions" and its init/continuation
- * prompts should not pollute the user's searchable prompt history.
+ * Tests that observer-sessions are blocked before any DB or SDK work.
+ * The SDK agent runs under project "observer-sessions" and must be rejected
+ * before session creation to prevent recursive agent spawning and pool exhaustion.
  */
 describe('Observer prompt filtering', () => {
-  it('SessionRoutes skips saveUserPrompt for observer-sessions project', async () => {
-    // Read the actual source to verify the filter exists
+  it('SessionRoutes blocks observer-sessions before createSDKSession in handleSessionInitByClaudeId', async () => {
     const fs = await import('fs');
     const source = fs.readFileSync('src/services/worker/http/routes/SessionRoutes.ts', 'utf-8');
 
-    // The code must skip saving prompts when project is 'observer-sessions'
-    const hasObserverFilter = source.includes("observer-sessions") &&
-      source.includes("saveUserPrompt");
+    // Extract the handleSessionInitByClaudeId method body (assignment, not declaration)
+    const methodStart = source.indexOf('handleSessionInitByClaudeId = this.wrapHandler');
+    const methodBody = source.slice(methodStart);
 
-    // The filter must appear BEFORE the saveUserPrompt call
-    const filterIndex = source.indexOf('observer-sessions');
+    // Within that method, observer-sessions must appear before createSDKSession
+    const filterIndex = methodBody.indexOf("observer-sessions");
+    const createSessionIndex = methodBody.indexOf('createSDKSession');
+
+    expect(filterIndex).toBeGreaterThan(-1);
+    expect(createSessionIndex).toBeGreaterThan(-1);
+    expect(filterIndex).toBeLessThan(createSessionIndex);
+  });
+
+  it('SessionRoutes blocks observer-sessions before saveUserPrompt', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/services/worker/http/routes/SessionRoutes.ts', 'utf-8');
+
+    const filterIndex = source.indexOf("observer-sessions");
     const saveIndex = source.indexOf('saveUserPrompt');
 
-    expect(hasObserverFilter).toBe(true);
+    expect(filterIndex).toBeGreaterThan(-1);
+    expect(saveIndex).toBeGreaterThan(-1);
     expect(filterIndex).toBeLessThan(saveIndex);
   });
 });
