@@ -137,20 +137,29 @@ describe('sanitizeEnv', () => {
     const result = sanitizeEnv({
       CLAUDE_CODE_OAUTH_TOKEN: 'my-oauth-token',
       CLAUDE_CODE_GIT_BASH_PATH: '/usr/bin/bash',
+      CLAUDE_CODE_USE_FOUNDRY: '1',
       CLAUDE_CODE_RANDOM_OTHER: 'should-be-stripped',
       CLAUDE_CODE_INTERNAL_FLAG: 'should-be-stripped',
       PATH: '/usr/bin'
     });
 
-    // Preserved: explicitly allowed CLAUDE_CODE_* vars
     expect(result.CLAUDE_CODE_OAUTH_TOKEN).toBe('my-oauth-token');
     expect(result.CLAUDE_CODE_GIT_BASH_PATH).toBe('/usr/bin/bash');
-
-    // Stripped: all other CLAUDE_CODE_* vars
+    expect(result.CLAUDE_CODE_USE_FOUNDRY).toBe('1');
     expect(result.CLAUDE_CODE_RANDOM_OTHER).toBeUndefined();
     expect(result.CLAUDE_CODE_INTERNAL_FLAG).toBeUndefined();
-
-    // Preserved: normal env vars
     expect(result.PATH).toBe('/usr/bin');
+  });
+
+  it('preserves CLAUDE_CODE_USE_FOUNDRY through sanitization', () => {
+    const result = sanitizeEnv({
+      CLAUDE_CODE_USE_FOUNDRY: '1',
+      PATH: '/usr/bin',
+      HOME: '/home/user'
+    });
+
+    expect(result.CLAUDE_CODE_USE_FOUNDRY).toBe('1');
+    expect(result.PATH).toBe('/usr/bin');
+    expect(result.HOME).toBe('/home/user');
   });
 });

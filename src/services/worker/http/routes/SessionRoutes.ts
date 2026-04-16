@@ -856,10 +856,17 @@ export class SessionRoutes extends BaseRouteHandler {
       return;
     }
 
-    // Step 5: Save cleaned user prompt
+    // Step 5: Skip observer-session prompts — the SDK agent's init/continuation
+    // prompts are synthetic and should not pollute searchable prompt history
+    if (project === 'observer-sessions') {
+      res.json({ sessionDbId, promptNumber, skipped: true, reason: 'observer-session' });
+      return;
+    }
+
+    // Step 6: Save cleaned user prompt
     store.saveUserPrompt(contentSessionId, promptNumber, cleanedPrompt);
 
-    // Step 6: Check if SDK agent is already running for this session (#1079)
+    // Step 7: Check if SDK agent is already running for this session (#1079)
     // If contextInjected is true, the hook should skip re-initializing the SDK agent
     const contextInjected = this.sessionManager.getSession(sessionDbId) !== undefined;
 

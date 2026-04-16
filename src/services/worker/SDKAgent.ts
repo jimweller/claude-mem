@@ -143,7 +143,13 @@ export class SDKAgent {
         pathToClaudeCodeExecutable: claudePath,
         // Custom spawn function captures PIDs to fix zombie process accumulation
         spawnClaudeCodeProcess: createPidCapturingSpawn(session.sessionDbId),
-        env: isolatedEnv  // Use isolated credentials from ~/.claude-mem/.env, not process.env
+        env: isolatedEnv,  // Use isolated credentials from ~/.claude-mem/.env, not process.env
+        // Workaround: Agent SDK defaults settingSources to [] when omitted.
+        // JS treats [] as truthy, so the SDK emits ["--setting-sources", ""].
+        // Bun drops the empty string, causing --permission-mode to be consumed
+        // as a --setting-sources value (exit code 1). false bypasses both the
+        // SDK's ?? [] default (not nullish) and its if() guard (falsy).
+        settingSources: false as any
       }
     });
 
