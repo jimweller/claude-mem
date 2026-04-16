@@ -812,6 +812,14 @@ export class SessionRoutes extends BaseRouteHandler {
       return;
     }
 
+    // Block observer-sessions before any DB or SDK work — the SDK agent's
+    // subprocess registers itself as observer-sessions, and creating a session
+    // here triggers another SDK agent spawn, cascading until pool exhaustion.
+    if (project === 'observer-sessions') {
+      res.json({ skipped: true, reason: 'observer-session' });
+      return;
+    }
+
     const store = this.dbManager.getSessionStore();
 
     // Step 1: Create/get SDK session (idempotent INSERT OR IGNORE)
@@ -856,14 +864,7 @@ export class SessionRoutes extends BaseRouteHandler {
       return;
     }
 
-    // Step 5: Skip observer-session prompts — the SDK agent's init/continuation
-    // prompts are synthetic and should not pollute searchable prompt history
-    if (project === 'observer-sessions') {
-      res.json({ sessionDbId, promptNumber, skipped: true, reason: 'observer-session' });
-      return;
-    }
-
-    // Step 6: Save cleaned user prompt
+    // Step 5: Save cleaned user prompt
     store.saveUserPrompt(contentSessionId, promptNumber, cleanedPrompt);
 
     // Step 7: Check if SDK agent is already running for this session (#1079)
