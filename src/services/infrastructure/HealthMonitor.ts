@@ -13,7 +13,7 @@ import path from 'path';
 import net from 'net';
 import { readFileSync } from 'fs';
 import { logger } from '../../utils/logger.js';
-import { MARKETPLACE_ROOT } from '../../shared/paths.js';
+import { getPluginRoot } from '../../shared/paths.js';
 
 /**
  * Make an HTTP request to the worker via TCP.
@@ -162,7 +162,7 @@ export async function httpShutdown(port: number): Promise<boolean> {
  */
 export function getInstalledPluginVersion(): string {
   try {
-    const packageJsonPath = path.join(MARKETPLACE_ROOT, 'package.json');
+    const packageJsonPath = path.join(getPluginRoot(), 'package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     return packageJson.version;
   } catch (error: unknown) {

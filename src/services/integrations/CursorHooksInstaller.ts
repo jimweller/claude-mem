@@ -16,7 +16,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../../utils/logger.js';
 import { getWorkerPort, workerHttpRequest } from '../../shared/worker-utils.js';
-import { DATA_DIR, MARKETPLACE_ROOT, CLAUDE_CONFIG_DIR } from '../../shared/paths.js';
+import { DATA_DIR, MARKETPLACE_ROOT, CLAUDE_CONFIG_DIR, getPluginRoot } from '../../shared/paths.js';
 import {
   readCursorRegistry as readCursorRegistryFromFile,
   writeCursorRegistry as writeCursorRegistryToFile,
@@ -126,15 +126,19 @@ export async function updateCursorContextForProject(projectName: string, _port: 
 // ============================================================================
 
 /**
- * Find MCP server script path
- * Searches in order: marketplace install, source repo
+ * Find a bundled plugin script by filename.
+ *
+ * Resolution order:
+ *   1. Plugin runtime root (CLAUDE_PLUGIN_ROOT, self-locate, or
+ *      installed_plugins.json — see getPluginRoot)
+ *   2. Legacy marketplace layout: <MARKETPLACE_ROOT>/plugin/scripts/
+ *   3. Development/source checkout: <cwd>/plugin/scripts/
  */
-export function findMcpServerPath(): string | null {
+function findPluginScript(filename: string): string | null {
   const possiblePaths = [
-    // Marketplace install location
-    path.join(MARKETPLACE_ROOT, 'plugin', 'scripts', 'mcp-server.cjs'),
-    // Development/source location
-    path.join(process.cwd(), 'plugin', 'scripts', 'mcp-server.cjs'),
+    path.join(getPluginRoot(), 'scripts', filename),
+    path.join(MARKETPLACE_ROOT, 'plugin', 'scripts', filename),
+    path.join(process.cwd(), 'plugin', 'scripts', filename),
   ];
 
   for (const p of possiblePaths) {
@@ -146,23 +150,17 @@ export function findMcpServerPath(): string | null {
 }
 
 /**
+ * Find MCP server script path
+ */
+export function findMcpServerPath(): string | null {
+  return findPluginScript('mcp-server.cjs');
+}
+
+/**
  * Find worker-service.cjs path for unified CLI
- * Searches in order: marketplace install, source repo
  */
 export function findWorkerServicePath(): string | null {
-  const possiblePaths = [
-    // Marketplace install location
-    path.join(MARKETPLACE_ROOT, 'plugin', 'scripts', 'worker-service.cjs'),
-    // Development/source location
-    path.join(process.cwd(), 'plugin', 'scripts', 'worker-service.cjs'),
-  ];
-
-  for (const p of possiblePaths) {
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-  return null;
+  return findPluginScript('worker-service.cjs');
 }
 
 /**

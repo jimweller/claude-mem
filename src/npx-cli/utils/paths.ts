@@ -24,9 +24,56 @@ export function claudeConfigDirectory(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 }
 
-/** Marketplace install directory for thedotmack. */
+/**
+ * Marketplace install directory for the upstream thedotmack distribution.
+ *
+ * This is the directory that `npx claude-mem install` writes into, and that
+ * the upstream marketplace clones into. It is not the same as the running
+ * plugin's install path, which is owned by Claude Code's plugin system.
+ * For runtime operations (start/stop/restart/status), prefer
+ * installedPluginDirectory() — it consults Claude Code's own registry.
+ */
 export function marketplaceDirectory(): string {
   return join(claudeConfigDirectory(), 'plugins', 'marketplaces', 'thedotmack');
+}
+
+/**
+ * Resolve the runtime install directory for claude-mem, regardless of which
+ * marketplace it was installed from.
+ *
+ * Resolution order:
+ *   1. CLAUDE_PLUGIN_ROOT env var (set by Claude Code in hook contexts)
+ *   2. First `claude-mem@*` entry in installed_plugins.json whose
+ *      installPath exists on disk
+ *   3. Fallback to marketplaceDirectory() + 'plugin' (legacy thedotmack
+ *      layout) — only correct for upstream npx-installed setups
+ */
+export function installedPluginDirectory(): string {
+  const envRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (envRoot && existsSync(envRoot)) {
+    return envRoot;
+  }
+
+  try {
+    const installedPath = installedPluginsPath();
+    if (existsSync(installedPath)) {
+      const data = JSON.parse(readFileSync(installedPath, 'utf-8'));
+      const plugins = data?.plugins ?? {};
+      for (const key of Object.keys(plugins)) {
+        if (!key.startsWith('claude-mem@')) continue;
+        const entries = plugins[key];
+        if (!Array.isArray(entries)) continue;
+        const installPath = entries[0]?.installPath;
+        if (typeof installPath === 'string' && existsSync(installPath)) {
+          return installPath;
+        }
+      }
+    }
+  } catch {
+    // Fall through to legacy fallback
+  }
+
+  return join(marketplaceDirectory(), 'plugin');
 }
 
 /** Top-level plugins directory. */
@@ -128,10 +175,19 @@ export function readPluginVersion(): string {
 // Installation detection
 // ---------------------------------------------------------------------------
 
-/** Returns true if the plugin appears to be installed in the marketplace dir. */
+/**
+ * Returns true if the plugin appears to be installed.
+ *
+ * Checks the runtime install (cache or non-thedotmack marketplace) first,
+ * then falls back to the upstream thedotmack marketplace layout.
+ */
 export function isPluginInstalled(): boolean {
-  const marketplaceDir = marketplaceDirectory();
-  return existsSync(join(marketplaceDir, 'plugin', '.claude-plugin', 'plugin.json'));
+  const runtimeRoot = installedPluginDirectory();
+  // Cache layout: <root>/.claude-plugin/plugin.json
+  if (existsSync(join(runtimeRoot, '.claude-plugin', 'plugin.json'))) return true;
+  // Marketplace layout: <root>/plugin/.claude-plugin/plugin.json
+  if (existsSync(join(runtimeRoot, 'plugin', '.claude-plugin', 'plugin.json'))) return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------

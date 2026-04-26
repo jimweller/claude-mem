@@ -11,7 +11,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import pc from 'picocolors';
 import { resolveBunBinaryPath } from '../utils/bun-resolver.js';
-import { isPluginInstalled, marketplaceDirectory } from '../utils/paths.js';
+import { installedPluginDirectory, isPluginInstalled } from '../utils/paths.js';
 
 // ---------------------------------------------------------------------------
 // Installation guard
@@ -45,7 +45,13 @@ function resolveBunOrExit(): string {
 // ---------------------------------------------------------------------------
 
 function workerServiceScriptPath(): string {
-  return join(marketplaceDirectory(), 'plugin', 'scripts', 'worker-service.cjs');
+  // Cache layout (non-thedotmack installs): <root>/scripts/worker-service.cjs
+  // Marketplace layout (legacy thedotmack): <root>/plugin/scripts/worker-service.cjs
+  const root = installedPluginDirectory();
+  const cacheLayoutPath = join(root, 'scripts', 'worker-service.cjs');
+  const marketplaceLayoutPath = join(root, 'plugin', 'scripts', 'worker-service.cjs');
+  if (existsSync(cacheLayoutPath)) return cacheLayoutPath;
+  return marketplaceLayoutPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +73,7 @@ function spawnBunWorkerCommand(command: string, extraArgs: string[] = []): void 
 
   const child = spawn(bunPath, args, {
     stdio: 'inherit',
-    cwd: marketplaceDirectory(),
+    cwd: installedPluginDirectory(),
     env: process.env,
   });
 
@@ -154,12 +160,12 @@ export function runTranscriptWatchCommand(): void {
   ensureInstalledOrExit();
   const bunPath = resolveBunOrExit();
 
-  const transcriptWatcherPath = join(
-    marketplaceDirectory(),
-    'plugin',
-    'scripts',
-    'transcript-watcher.cjs',
-  );
+  const root = installedPluginDirectory();
+  const cacheLayoutTranscriptPath = join(root, 'scripts', 'transcript-watcher.cjs');
+  const marketplaceLayoutTranscriptPath = join(root, 'plugin', 'scripts', 'transcript-watcher.cjs');
+  const transcriptWatcherPath = existsSync(cacheLayoutTranscriptPath)
+    ? cacheLayoutTranscriptPath
+    : marketplaceLayoutTranscriptPath;
 
   if (!existsSync(transcriptWatcherPath)) {
     // Fall back to worker-service with transcript subcommand
@@ -169,7 +175,7 @@ export function runTranscriptWatchCommand(): void {
 
   const child = spawn(bunPath, [transcriptWatcherPath, 'watch'], {
     stdio: 'inherit',
-    cwd: marketplaceDirectory(),
+    cwd: installedPluginDirectory(),
     env: process.env,
   });
 

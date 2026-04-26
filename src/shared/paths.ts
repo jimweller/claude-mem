@@ -1,6 +1,6 @@
 import { join, dirname, basename, sep } from 'path';
 import { homedir } from 'os';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { SettingsDefaultsManager } from './SettingsDefaultsManager.js';
@@ -58,8 +58,71 @@ export const DATA_DIR = resolveDataDir();
 // Note: CLAUDE_CONFIG_DIR is a Claude Code setting, not claude-mem, so leave as env var
 export const CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 
-// Plugin installation directory - respects CLAUDE_CONFIG_DIR for users with custom Claude locations
+// Marketplace clone directory - the git checkout that powers BranchManager's
+// stable/beta switching feature. NOT the plugin's runtime root; see PLUGIN_ROOT.
+// Hardcoded to the upstream marketplace name; only meaningful when running on
+// the upstream install. Forks that need branch-switching from their own
+// marketplace must override this (out of scope for this change).
 export const MARKETPLACE_ROOT = join(CLAUDE_CONFIG_DIR, 'plugins', 'marketplaces', 'thedotmack');
+
+/**
+ * Resolve the plugin's runtime root directory.
+ *
+ * The runtime root is the directory containing this plugin's `scripts/`,
+ * `skills/`, `commands/`, `.claude-plugin/` etc. — the layout Claude Code
+ * actually executes from.
+ *
+ * Resolution order:
+ *   1. CLAUDE_PLUGIN_ROOT env var. Claude Code sets this to the cache
+ *      directory (`<plugins>/cache/<owner>/<plugin>/<version>`) when invoking
+ *      hooks. This is the canonical answer in hook context.
+ *   2. Self-location of the bundled script. The bundled scripts ship at
+ *      `<root>/scripts/<bundle>.cjs`, so the runtime root is the parent of
+ *      this module's `_dirname`. Works inside worker-service.cjs,
+ *      mcp-server.cjs, etc., regardless of where they were copied.
+ *   3. installed_plugins.json lookup. Reads Claude Code's own record of
+ *      where the plugin is installed. Used by the npx CLI which has neither
+ *      the env var nor a co-located bundle.
+ *   4. Legacy fallback: `<MARKETPLACE_ROOT>/plugin`. Only correct on the
+ *      upstream marketplace install; preserved for backward compatibility.
+ */
+export function getPluginRoot(): string {
+  // 1. Hook context — env var
+  const envRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (envRoot && existsSync(envRoot)) {
+    return envRoot;
+  }
+
+  // 2. Bundled-script self-location
+  const fromBundle = join(_dirname, '..');
+  if (existsSync(join(fromBundle, '.claude-plugin', 'plugin.json'))) {
+    return fromBundle;
+  }
+
+  // 3. installed_plugins.json — first claude-mem entry that points at an
+  //    install path that exists on disk
+  try {
+    const installedPath = join(CLAUDE_CONFIG_DIR, 'plugins', 'installed_plugins.json');
+    if (existsSync(installedPath)) {
+      const data = JSON.parse(readFileSync(installedPath, 'utf-8'));
+      const plugins = data?.plugins ?? {};
+      for (const key of Object.keys(plugins)) {
+        if (!key.startsWith('claude-mem@')) continue;
+        const entries = plugins[key];
+        if (!Array.isArray(entries)) continue;
+        const installPath = entries[0]?.installPath;
+        if (typeof installPath === 'string' && existsSync(installPath)) {
+          return installPath;
+        }
+      }
+    }
+  } catch {
+    // Fall through to legacy fallback
+  }
+
+  // 4. Legacy fallback
+  return join(MARKETPLACE_ROOT, 'plugin');
+}
 
 // Data subdirectories
 export const ARCHIVES_DIR = join(DATA_DIR, 'archives');
