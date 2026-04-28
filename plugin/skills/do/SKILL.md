@@ -1,6 +1,8 @@
 ---
 name: do
 description: Execute a phased implementation plan using subagents. Use when asked to execute, run, or carry out a plan — especially one created by make-plan.
+disable-model-invocation: true
+user-invocable: false
 ---
 
 # Do Plan

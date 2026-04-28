@@ -1,6 +1,8 @@
 ---
 name: smart-explore
 description: Token-optimized structural code search using tree-sitter AST parsing. Use instead of reading full files when you need to understand code structure, find functions, or explore a codebase efficiently.
+disable-model-invocation: true
+user-invocable: false
 ---
 
 # Smart Explore
