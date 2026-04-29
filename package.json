@@ -1,6 +1,6 @@
 {
   "name": "claude-mem",
-  "version": "12.1.5-j5",
+  "version": "12.1.5-j6",
   "description": "Memory compression system for Claude Code - persist context across sessions",
   "keywords": [
     "claude",
@@ -42,7 +42,6 @@
   },
   "files": [
     "dist",
-    "plugin/.claude-plugin",
     "plugin/CLAUDE.md",
     "plugin/package.json",
     "plugin/hooks",
